@@ -1,4 +1,6 @@
 import spotify_manager
+import subprocess
+import re as re
 from functools import lru_cache 
 
 MENU_PAGE_SIZE = 6
@@ -168,6 +170,17 @@ class NowPlayingPage():
         self.live_render = NowPlayingRendering()
         self.is_title = False
 
+        # get all audio devices without using extra packages
+        self.amixer_audio_devices = subprocess.check_output("amixer scontrols", shell=True, universal_newlines=True) # get all alsa audio devices to be able to change volume
+        self.amixer_audio_devices = str(self.amixer_audio_devices).split("\n") # split string into list
+
+        for x in self.amixer_audio_devices:
+            if x == "": # remove empty entries (the last one is usually/always empty)
+                self.amixer_audio_devices.remove(x)
+                return
+            
+            self.amixer_audio_devices[self.amixer_audio_devices.index(x)] = x.replace("Simple mixer control '", "").replace(f"',{self.amixer_audio_devices.index(x)}", "") # cut string to get relevant part (simple mixer name)
+
     def play_previous(self):
         spotify_manager.play_previous()
         self.live_render.refresh()
@@ -190,10 +203,12 @@ class NowPlayingPage():
         spotify_manager.run_async(lambda: self.toggle_play()) 
 
     def nav_up(self):
-        pass
+        for x in self.amixer_audio_devices: # up the volume for all mixers
+            subprocess.check_output(f"amixer sset \"{x}\" 1%+", shell=True) # using check_output here because Popen logs all response messages and we don't want to clog up the terminal
 
     def nav_down(self):
-        pass
+        for x in self.amixer_audio_devices: # up the volume for all mixers
+            subprocess.check_output(f"amixer sset \"{x}\" 1%-", shell=True) # using check_output here because Popen logs all response messages and we don't want to clog up the terminal
 
     def nav_select(self):
         return self
